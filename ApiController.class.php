@@ -291,45 +291,67 @@ class ApiController extends HomeController
      */
     public function recordSport()
     {
-        $userid = isset($_POST['uid']) ? $_POST['uid'] : '';
-        $steps = isset($_POST['steps']) ? $_POST['steps'] : '';
-        $distance = isset($_POST['distance']) ? $_POST['distance'] : '';
-        $stepdetail = isset($_POST['stepdetail']) ? $_POST['stepdetail'] : '';
-        $sporttime = isset($_POST['sporttime']) ? $_POST['sporttime'] : '';
+//        $userid = isset($_POST['uid']) ? $_POST['uid'] : '';
+//        $steps = isset($_POST['steps']) ? $_POST['steps'] : '';
+//        $distance = isset($_POST['distance']) ? $_POST['distance'] : '';
+//        $stepdetail = isset($_POST['stepdetail']) ? $_POST['stepdetail'] : '';
+//        $sporttime = isset($_POST['sporttime']) ? $_POST['sporttime'] : '';
 
-        Log::write( $userid.'---'.$steps.'---'.$distance.'---'.$stepdetail .'---'.$sporttime,'WARN');
 
-        if (!$userid || !$steps || !$distance||!$stepdetail||!$sporttime) {
-            $this->ajaxReturn(array("type" => "error", "msg" => "缺少必须参数"), 'JSON');
+        $req_datas=json_decode(file_get_contents('php://input'));
+
+        $userid =$req_datas->uid;
+
+       Log::write( 'uid---->'.$userid,'WARN');
+
+        if (!$userid ) {
+            $this->ajaxReturn(array("type" => "error", "msg" => "缺少必须参数uid"), 'JSON');
             return;
         }
-   //     Log::write( '------------->1' ,'WARN');
-        $sport = D('Sport');
 
-        //获取当天运动数据
-        $r = $sport->getTodaySport($userid,$sporttime);
-        //	var_dump($r[0]);die;
-        if ($r) {//更新
-            $r[0]['steps'] = $steps;
-            $r[0]['distance'] = $distance;
-            $r[0]['committime'] = time();
-            $r[0]['sporttime'] =strtotime(date("Y-m-d 00:00:00", strtotime($sporttime)));
-            $r[0]['stepdetail'] = $stepdetail;
-            $sport->save($r[0]);
-//     		echo 'update';
-        } else {//添加
-            $r['uid'] = $userid;
-            $r['steps'] = $steps;
-            $r['distance'] = $distance;
-            $r['committime'] = time();
-            $r['sporttime'] =strtotime(date("Y-m-d 00:00:00", strtotime($sporttime)));
-         //   $r['sporttime'] = time();
-            $r['stepdetail'] = $stepdetail;
-            $sport->add($r);
-//     		echo 'add';
+        $notprocessed=  array();
+
+        $datas =$req_datas->stepdata;
+
+        foreach ($datas  as $key=>$tmp){
+            $steps = $tmp->steps;
+           $distance =$tmp->distance;
+           $stepdetail=$tmp->stepdetail;
+           $sporttime =$tmp->sporttime;
+
+            if (!$steps||!$distance||!$stepdetail||!$sporttime)  {
+                array_push($notprocessed,$tmp);
+                continue;
+            }
+            $sport = D('Sport');
+
+            //获取当天运动数据
+            $r = $sport->getTodaySport($userid,$sporttime);
+            //	var_dump($r[0]);die;
+            if ($r) {//更新
+                $r[0]['steps'] = $steps;
+                $r[0]['distance'] = $distance;
+                $r[0]['committime'] = time();
+                $r[0]['sporttime'] =strtotime(date("Y-m-d 00:00:00", strtotime($sporttime)));
+                $r[0]['stepdetail'] = $stepdetail;
+                $sport->save($r[0]);
+
+            } else {//添加
+                $r['uid'] = $userid;
+                $r['steps'] = $steps;
+                $r['distance'] = $distance;
+                $r['committime'] = time();
+                $r['sporttime'] =strtotime(date("Y-m-d 00:00:00", strtotime($sporttime)));
+                //   $r['sporttime'] = time();
+                $r['stepdetail'] = $stepdetail;
+                $sport->add($r);
+
+            }
+
         }
-   //     Log::write( '------------->2' ,'WARN');
-        $this->ajaxReturn(array("type" => "success", "msg" => "已记录运动数据"), 'JSON');
+
+
+        $this->ajaxReturn(array("type" => "success", "msg" => "已记录运动数据","errordata"=>$notprocessed), 'JSON');
         return;
     }
 
